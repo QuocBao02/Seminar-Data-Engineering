@@ -1,13 +1,8 @@
 from pyspark.sql import SparkSession
 
-spark = SparkSession.builder.appName("PySpark Test").getOrCreate()
+spark = SparkSession.builder.appName("Read_data").getOrCreate()
+data=spark.read.parquet("/home/quocbao/Downloads/data.parquet")
 
-data = [("Alice", 34), ("Bob", 45), ("Cathy", 29)]
-
-columns = ["Name", "Age"]
-
-df = spark.createDataFrame(data, columns)
-
-df.show()
+data.show()
 
 spark.stop()
