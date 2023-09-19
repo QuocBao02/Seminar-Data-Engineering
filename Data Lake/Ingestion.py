@@ -3,6 +3,7 @@ import binance
 from  pyspark.sql import SparkSession
 import pandas as pd
 import time
+import json 
 
 
 class Binance_Ingestion_Data_Lake(object):
@@ -40,7 +41,7 @@ class Binance_Ingestion_Data_Lake(object):
         '''
         # create spark session 
         spark=SparkSession.builder.appName("AppendDataToDataLake").getOrCreate()
-        df=spark.createDataFrame(data_source)
+        df=spark.createDataFrame([data_source])
         df.write.parquet(destination, mode='append')
         spark.stop()
         pass 
@@ -65,7 +66,8 @@ class Binance_Ingestion_Data_Lake(object):
         table='SymbolInfor'
         symbol_info = self.binance_cli.get_symbol_info(symbol=symbol)
         hdfs_des=self._generatePartition(table)
-        self._saveintoHDFS(source=pd.DataFrame(symbol_info, index=[0]), destination=hdfs_des)
+        print(symbol_info)
+        self._saveintoHDFS(data_source=symbol_info, destination=hdfs_des)
         print(f"Loaded into {table} successfully!")
         pass
     
@@ -81,7 +83,7 @@ class Binance_Ingestion_Data_Lake(object):
         self.closeTime=ticker_24h['closeTime']
         
         hdfs_des=self._generatePartition(table)
-        self._saveintoHDFS(source=pd.DataFrame(ticker_24h, index=[0]), destination=hdfs_des)
+        self._saveintoHDFS(data_source=ticker_24h, destination=hdfs_des)
         print(f"Loaded into {table} successfully!")
         pass
     
@@ -92,7 +94,7 @@ class Binance_Ingestion_Data_Lake(object):
         hdfs_des=self._generatePartition(table)
         for id in range(self.firstId, self.lastId+1, self.step):
             trades=self.binance_cli.get_historical_trades(symbol=symbol, fromId=id, limit=1000)
-            self._saveintoHDFS(source=pd.DataFrame(trades, index=[0]), destination=hdfs_des)
+            self._saveintoHDFS(data_source=trades, destination=hdfs_des)
             # sleep for a short time
             time.sleep(60/(self.request_per_minute+1))
         print(f"Loaded into {table} successfully!")
@@ -104,7 +106,7 @@ class Binance_Ingestion_Data_Lake(object):
         hdfs_des=self._generatePartition(table)
         for starttime in range(self.openTime, self.closeTime + 1, self.amount_in_12h*60*1000):
             klines=self.binance_cli.get_klines(symbol=symbol, interval=binance.Client.KLINE_INTERVAL_1MINUTE, startTime=starttime, limit=self.amount_in_12h)
-            self._saveintoHDFS(source=pd.DataFrame(klines, index=[0]), destination=hdfs_des)
+            self._saveintoHDFS(data_source=klines, destination=hdfs_des)
             # sleep for a short time 
             time.sleep(60/(self.request_per_minute + 1))
         print(f"Loaded into {table} successfully!")
