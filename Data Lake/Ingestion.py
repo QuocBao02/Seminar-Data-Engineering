@@ -127,9 +127,11 @@ def main():
     (api_key, secret_key)=get_api(path=api_path)
     Database="Binance_Market_Data"
     symbol="BTCUSDT"
-    binance_datalake=Binance_Ingestion_Data_Lake(api_key=api_key, secret_key=secret_key)
+    binance_datalake=Binance_Ingestion_Data_Lake(api_key=api_key, secret_key=secret_key, database=Database)
     binance_datalake.getSymbolInfor(symbol=symbol)
-    
+    binance_datalake.getTicker_24h(symbol=symbol)
+    binance_datalake.getTrades(symbol=symbol)
+    binance_datalake.getKlines(symbol=symbol)
     binance_datalake.disconnect_Binance()
 
 if __name__=='__main__':
