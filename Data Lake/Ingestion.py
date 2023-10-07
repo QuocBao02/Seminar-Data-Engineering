@@ -1,9 +1,7 @@
 # import library 
 import binance
 from  pyspark.sql import SparkSession
-import pandas as pd
 import time
-import json 
 
 
 class Binance_Ingestion_Data_Lake(object):
@@ -17,6 +15,7 @@ class Binance_Ingestion_Data_Lake(object):
         self.request_per_minute=1200
         self.amount_in_12h=720
         self.binance_cli=self._connect_Binance()
+        self.spark=self._initSpark()
         self.partition=self._getPartitionTime()
         
     def _connect_Binance(self):
@@ -34,17 +33,17 @@ class Binance_Ingestion_Data_Lake(object):
             self.binance_cli.close_connection() 
         print('Binance connection is closed!')
         
-    def _saveintoHDFS(self,data_source, destination):
-        '''Get pandas dataframe, using spark to save into hadoop hdfs
-            source: pandas dataframe
-            destination: hdfs path
+    def _initSpark(self):
+        ''' Initialize Spark Session
         '''
         # create spark session 
         spark=SparkSession.builder.appName("AppendDataToDataLake").getOrCreate()
-        df=spark.createDataFrame([data_source])
-        df.write.parquet(destination, mode='append')
-        spark.stop()
-        pass 
+        return spark
+    
+    def closeSpark(self):
+        '''Close Spark Session'''
+        self.spark.stop()
+        print("Spark Session is Closed!")
     
     def _getPartitionTime(self):
         '''Create directory to save data into data lake in hadoop hdfs'''
@@ -65,9 +64,9 @@ class Binance_Ingestion_Data_Lake(object):
         '''Get the information of a symbol and save it into datalake'''
         table='SymbolInfor'
         symbol_info = self.binance_cli.get_symbol_info(symbol=symbol)
-        hdfs_des=self._generatePartition(table)
-        print(symbol_info)
-        self._saveintoHDFS(data_source=symbol_info, destination=hdfs_des)
+        hdfs_destination=self._generatePartition(table)
+        df=self.spark.createDataFrame([symbol_info])
+        df.write.parquet(hdfs_destination, mode='append')        
         print(f"Loaded into {table} successfully!")
         pass
     
@@ -82,8 +81,9 @@ class Binance_Ingestion_Data_Lake(object):
         self.openTime=ticker_24h['openTime']
         self.closeTime=ticker_24h['closeTime']
         
-        hdfs_des=self._generatePartition(table)
-        self._saveintoHDFS(data_source=ticker_24h, destination=hdfs_des)
+        hdfs_destination=self._generatePartition(table)
+        df=self.spark.createDataFrame([ticker_24h])
+        df.write.parquet(hdfs_destination, mode='append')      
         print(f"Loaded into {table} successfully!")
         pass
     
@@ -91,10 +91,11 @@ class Binance_Ingestion_Data_Lake(object):
     def getTrades(self, symbol):
         '''Get all trades of a symbol in a day and save it into datalake'''
         table='Trades'
-        hdfs_des=self._generatePartition(table)
+        hdfs_destination=self._generatePartition(table)
         for id in range(self.firstId, self.lastId+1, self.step):
             trades=self.binance_cli.get_historical_trades(symbol=symbol, fromId=id, limit=1000)
-            self._saveintoHDFS(data_source=trades, destination=hdfs_des)
+            df=self.spark.createDataFrame(trades)
+            df.write.parquet(hdfs_destination, mode='append')      
             # sleep for a short time
             time.sleep(60/(self.request_per_minute+1))
         print(f"Loaded into {table} successfully!")
@@ -103,14 +104,16 @@ class Binance_Ingestion_Data_Lake(object):
     def getKlines(self, symbol):
         '''Get the klines of all trades of a symbol in a day and save it into datalake'''
         table="Klines"
-        hdfs_des=self._generatePartition(table)
+        hdfs_destination=self._generatePartition(table)
         for starttime in range(self.openTime, self.closeTime + 1, self.amount_in_12h*60*1000):
             klines=self.binance_cli.get_klines(symbol=symbol, interval=binance.Client.KLINE_INTERVAL_1MINUTE, startTime=starttime, limit=self.amount_in_12h)
-            self._saveintoHDFS(data_source=klines, destination=hdfs_des)
+            df=self.spark.createDataFrame(klines)
+            df.write.parquet(hdfs_destination, mode='append')  
             # sleep for a short time 
             time.sleep(60/(self.request_per_minute + 1))
         print(f"Loaded into {table} successfully!")
         pass    
+        
 
 def get_api(path):
     '''Get api from local file'''
@@ -132,7 +135,9 @@ def main():
     binance_datalake.getTicker_24h(symbol=symbol)
     binance_datalake.getTrades(symbol=symbol)
     binance_datalake.getKlines(symbol=symbol)
+    binance_datalake.closeSpark()
     binance_datalake.disconnect_Binance()
+    
 
 if __name__=='__main__':
     main()
