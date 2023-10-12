@@ -4,8 +4,6 @@ from pyspark.sql.types import StringType
 import binance
 import json
 import pandas as pd
-# import pyarrow as pa
-# import pyarrow.parquet as pq
 from hdfs import InsecureClient
 from datetime import datetime
 import time
@@ -21,7 +19,8 @@ class Binance(object):
         self.hdfs_host = hdfs_host
         self.hdfs_port = hdfs_port
 
-        self.request_per_minute=1200
+        self.request_per_minute=1500
+        self.amount_in_12h=720
         self.client = self._connect_Binace()
         self.partition=self._get_partition_time()
     
@@ -49,7 +48,13 @@ class Binance(object):
             destination: hdfs path
         '''
         # create spark session 
-        spark=SparkSession.builder.appName("Save to DataLake").getOrCreate()
+        # spark=SparkSession.builder.appName("Save to DataLake").getOrCreate()
+        spark = SparkSession.builder \
+            .appName("Save to DataLake") \
+            .config("spark.driver.memory", "6g") \
+            .config("spark.executor.memory", "3g") \
+            .config("spark.executor.cores", "4") \
+            .getOrCreate()
         try:
             # Chuyển dữ liệu thành chuỗi JSON
             json_data = json.dumps(data)
@@ -80,88 +85,99 @@ class Binance(object):
         table='symbol_infor'
         data = []
         for symbol in symbols:
-            time.sleep(0.5)
+            time.sleep(0.1)
             data.append(self.client.get_symbol_info(symbol=symbol))
         hdfs_des=self._generate_partition(table)
-        print(data)
+        # print(data)
         self._write_file_hdfs(data = data, destination = hdfs_des)
         print(f"Loaded into {table} successfully!")
         pass
     
-    def get_ticker_24h(self, symbol):
+    def get_ticker_24h(self, symbols):
         '''Get the information of Ticker in 24h of a symbol and save it into datalake'''
-        table='Ticker_24h'
-        ticker_24h=self.client.get_ticker(symbol=symbol)
-        # get firstId and lastId 
-        self.firstId=ticker_24h['firstId']
-        self.lastId=ticker_24h['lastId']
-        # get openTime and closeTime
-        self.openTime=ticker_24h['openTime']
-        self.closeTime=ticker_24h['closeTime']
-        
-        hdfs_des=self._generatePartition(table)
-        self._saveintoHDFS(data_source=ticker_24h, destination=hdfs_des)
+        table='ticker_24h'
+        symbols_list = []
+        data = []
+        for symbol in symbols:
+            time.sleep(0.1)
+            ticker_24h=self.client.get_ticker(symbol=symbol)
+            symbol_data = {
+                "symbol" : ticker_24h["symbol"],
+                "firstId" : ticker_24h["firstId"],
+                "lastId" : ticker_24h["lastId"],
+                "openTime" : ticker_24h["openTime"], 
+                "closeTime" : ticker_24h["closeTime"]
+            }
+            data.append(ticker_24h)
+            symbols_list.append(symbol_data)
+        # print(symbols_list)
+        # print(data)
+        hdfs_des=self._generate_partition(table)
+        self._write_file_hdfs(data = data, destination = hdfs_des)
         print(f"Loaded into {table} successfully!")
-        pass
+        return symbols_list
 
-    def get_historical_trades(self, **params):
-        trades = self.client.get_historical_trades()
-        return trades
+    def get_trades(self, symbols_list):
+        '''Get all trades of a symbol in a day and save it into datalake'''
+        table='trades'
+        data = []
+        for symbol in symbols_list:
+            time.sleep(0.1)
+            symbol_name = symbol["symbol"]
+            for current_id in range(symbol["firstId"], symbol["lastId"] - 1, 1000):
+                # print(f"Symbol: {symbol_name}, Current ID: {current_id}")
+                trades = self.client.get_historical_trades(symbol = symbol_name, fromId=current_id, limit=1000)
+                trades_data = {
+                    "symbol" : symbol_name,
+                    "trade" : trades
+                }
+                data.append(trades_data)
+        # print(data)
+        hdfs_des=self._generate_partition(table)
+        self._write_file_hdfs(data = data, destination = hdfs_des)
+        print(f"Loaded into {table} successfully!")
 
-    def get_klines(self, **params):
-        klines = self.client.get_klines()
-        return klines 
+
+    def get_klines(self, symbols_list):
+        '''Get the klines of all trades of a symbol in a day and save it into datalake'''
+        table = "klines"
+        data = []
+        
+        for symbol in symbols_list:
+            # time.sleep(0.2)
+            for starttime in range(symbol["openTime"], symbol["closeTime"] + 1, self.amount_in_12h*60*1000):
+                klines = self.client.get_klines(symbol = symbol["symbol"], interval=binance.Client.KLINE_INTERVAL_1MINUTE, startTime=starttime, limit=self.amount_in_12h)
+                klines_data = {
+                    "symbol" : symbol["symbol"],
+                    "trade" : klines
+                }
+                data.append(klines_data)
+                # sleep for a short time 
+                time.sleep(60/(self.request_per_minute + 1))
+
+        hdfs_des = self._generate_partition(table)
+        # print(data)
+        self._write_file_hdfs(data = data, destination = hdfs_des)
+        print(f"Loaded into {table} successfully!")
 
 
 
 if __name__=='__main__':
     _binance = Binance( api=api_key, secret_key=api_secret)
-    # ticker_id = 1
-    # kline_id = 1
-    # symbol = "BTCUSDT" 
 
-    # #tickers = _binance.get_all_tickers()
-    # #print(tickers)
-    # #_binance.write_file(tickers,"tickers")
-    # symbols=_binance.get_symbols()
-    # spark_data= pd.DataFrame(symbols)
-    # print(spark_data.symbol.tail())
-  
-
-    # for symbol in _binance._get_symbol_list():
-    #     symbol_info=_binance.client.get_ticker(symbol="ONEBUSD")
-    #     print(symbol_info)
-    # pass
-    # print(_binance.client.get_historical_trades(symbol="ONEBUSD", fromId=470, limit=1000))
-
-    # (firstId, lastId), (openTime, closeTime) = _binance.insert_Ticker_24h(ticker_id=ticker_id, symbol_id=symbol_id)
-    # _binance.insert_Trades(start_trade_id=firstId, end_trade_id=lastId, symbol_id=symbol_id) 
-    # # print((firstId, lastId))
-    # _binance.insert_Klines(openTime=openTime, closeTime=closeTime, kline_id=kline_id, symbol_id = symbol_id)
-    # print(len(_binance.client.get_klines(symbol = symbol, startTime=openTime, interval=binance.Client.KLINE_INTERVAL_1MINUTE)))
-    # print((firstId, lastId), (openTime, closeTime))
-    # _binance.disconnect_Binance()
-    # _binance.disconnect_Mysql_server()
-
-
+    #symbol_list
     symbols=_binance._get_symbol_list()
     # print(symbols)
+
+    #symbol_info
     _binance.get_symbol_infor(symbols=symbols)
 
-    # students = {
-    #     "student1": {
-    #         "name": "John",
-    #         "yearofbirth": 2000,
-    #         "class": "12A1"
-    #     },
-    #     "student2": {
-    #         "name": "Kane",
-    #         "yearofbirth": 2002,
-    #         "class": "11B1"
-    #     },
-    #     "student3":{
-    #         "name": "Son",
-    #         "yearofbirth": 2001,
-    #         "class": "12A2"
-    #     }
-    #     }
+    #ticker_24h
+    symbols_list=_binance.get_ticker_24h(symbols=symbols)
+    # print(symbols_list)
+
+    # trade
+    _binance.get_trades(symbols_list=symbols_list)
+
+    #klines
+    _binance.get_klines(symbols_list=symbols_list)
