@@ -1,12 +1,14 @@
 from pyspark.sql import SparkSession
 import os
+from pyspark.sql.types import StringType
 import binance
 import json
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
+# import pyarrow as pa
+# import pyarrow.parquet as pq
 from hdfs import InsecureClient
 from datetime import datetime
+import time
 
 api_key = "aRkqlapnqhNXa1bYU4Q7QWkru6DHA5sdRrmKxnRTPXjbXbZhqOPCJ8p0oNCNNbhY"
 api_secret = "uK3edZV3Wy2blZHEC67UlsQVgm48JRz1WlWi5ZNrJDg4Aajt3B0QwDMQjOS6cHnH"
@@ -38,7 +40,7 @@ class Binance(object):
     
     def _generate_partition(self, table):
         '''Generate the path to save into datalake'''
-        hdfs_path=f"hdfs://{self.hdfs_host}:{self.hdfs_port}/user/{self.database}/lake/{table}/{self.partition}/{table}.parquet"
+        hdfs_path=f"hdfs://{self.hdfs_host}:{self.hdfs_port}/user/{self.database}/lake/{table}/{self.partition}/{table}.json"
         return hdfs_path 
     
     def _write_file_hdfs(self,data, destination):
@@ -48,14 +50,19 @@ class Binance(object):
         '''
         # create spark session 
         spark=SparkSession.builder.appName("Save to DataLake").getOrCreate()
-        # df=spark.createDataFrame([data])
-        # create a Spark RDD from the Pandas DataFrame
-        rdd=spark.sparkContext.parallelize(data)
+        try:
+            # Chuyển dữ liệu thành chuỗi JSON
+            json_data = json.dumps(data)
 
-        # create a Spark DataFrame from the RDD
-        # df=spark.createDataFrame(rdd)
-        
-        rdd.saveAsTextFile(destination)
+            # Tạo DataFrame từ chuỗi JSON
+            df = spark.createDataFrame([json_data], StringType())
+
+            # Lưu DataFrame xuống HDFS dưới dạng tệp JSON
+            df.write.mode("overwrite").json(destination)
+
+            print(f"Save to DataLake with {destination}")
+        except Exception as e:
+            print(f"Error: {str(e)}")
         spark.stop()
         pass 
 
@@ -73,8 +80,10 @@ class Binance(object):
         table='symbol_infor'
         data = []
         for symbol in symbols:
+            time.sleep(0.5)
             data.append(self.client.get_symbol_info(symbol=symbol))
         hdfs_des=self._generate_partition(table)
+        print(data)
         self._write_file_hdfs(data = data, destination = hdfs_des)
         print(f"Loaded into {table} successfully!")
         pass
@@ -136,7 +145,8 @@ if __name__=='__main__':
 
 
     symbols=_binance._get_symbol_list()
-    _binance.get_symbol_infor(symbols="BTCUSDT")
+    # print(symbols)
+    _binance.get_symbol_infor(symbols=symbols)
 
     # students = {
     #     "student1": {
