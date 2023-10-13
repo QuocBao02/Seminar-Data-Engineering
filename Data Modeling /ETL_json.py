@@ -9,15 +9,7 @@ import json
 #     return partition
 # create spark session 
 # spark=SparkSession.builder.appName("Save to DataLake").getOrCreate()
-spark = SparkSession.builder \
-    .appName("ETL to DataLake") \
-    .config("hive.metastore.uris", "thrift://localhost:9083") \
-    .config("hive.exec.dynamic.partition", "true") \
-    .config("hive.exec.dynamic.partition.mode", "nonstrict") \
-    .config("spark.driver.memory", "6g") \
-    .config("spark.executor.memory", "3g") \
-    .config("spark.executor.cores", "4") \
-    .getOrCreate()
+
 
 # Định nghĩa schema cho dữ liệu JSON
 # custom_schema = StructType([
@@ -96,47 +88,43 @@ spark = SparkSession.builder \
 # ])
 
 
-hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/klines/year=2023/month=10/day=13/klines.json'
+spark = SparkSession.builder \
+    .appName("ETL to DataLake") \
+    .config("hive.metastore.uris", "thrift://localhost:9083") \
+    .config("hive.exec.dynamic.partition", "true") \
+    .config("hive.exec.dynamic.partition.mode", "nonstrict") \
+    .config("spark.driver.memory", "10g") \
+    .config("spark.executor.memory", "10g") \
+    .config("spark.executor.cores", "8") \
+    .getOrCreate()
 
-df = spark.read.json(hdfs_path)
-# from pyspark.sql.functions import from_json
-# df = df.withColumn("value", from_json(df["value"],schema=custom_schema))
-# Chọn các cột quan trọng
-# df = df.select("value.*")
-
-# Hiển thị kết quả
-json.dumps(df.select("value").first()[0])
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/symbol_infor/year=2023/month=10/day=13/symbol_infor.json'
+df = spark.read.json(hdfs_path, multiLine=True)
+#json.dumps(df.select("value").first()[0])
 data = json.loads(df.select("value").first()[0])
-# print(data)
+df = spark.createDataFrame(data)
+# df.select("symbol", "status", "baseAsset", "baseAssetPrecision", "quoteAsset","quotePrecision", "icebergAllowed", "orderTypes" ).show(50)
+df.show()
+#ticker_24h
+
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/ticker_24h/year=2023/month=10/day=13/ticker_24h.json'
+
+df = spark.read.json(hdfs_path, multiLine=True)
+# json.dumps(df.select("value").first()[0])
+data = json.loads(df.select("value").first()[0])
+# # print(data)
 df = spark.createDataFrame(data)
 df.show(50)
-# print(df.select("value").first()[0])
-# df = spark.createDataFrame([df.select("value").first()[0]],  schema=custom_schema)
-# # df = df.na.drop()
-# # df.show()
-# json_data = df.toJSON().collect()
-# df.printSchema()
-# In kết quả
-# for row in json_data:
-#     print(f"row\n")
-# Thực hiện các biến đổi ETL (ví dụ: chọn một số cột)
-# transformed_df = df.select("symbol", "status", "baseAsset")
 
-# # # Hiển thị kết quả biến đổi
-# transformed_df.show()
+# #trades
 
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/trades/year=2023/month=10/day=13/trades.json'
 
-# spark = SparkSession.builder.appName("PySparkTest")\
-#     .config("hive.metastore.uris", "thrift://localhost:8689")\
-#     .config("spark.sql.warehouse.dir", "/home/hadoop/Binance_Market_Data")\
-#     .enableHiveSupport()\
-#     .getOrCreate()
-
-# spark.sql("CREATE DATABASE test;")
-# spark.sql("USE test;")
-# spark.sql("CREATE TABLE table(id int, name string);")
-# spark.sql("INSERT INTO TABLE test VALUES (1, 'Bao');")
-# result=spark.sql("SELECT * FROM test")
-# result.show()
-
-# spark.stop()
+df = spark.read.json(hdfs_path, multiLine=True)
+# json.dumps(df.select("value").first()[0])
+data = json.loads(df.select("value").first()[0])
+# # print(data)
+df = spark.createDataFrame(data)
+df.show(50)
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")

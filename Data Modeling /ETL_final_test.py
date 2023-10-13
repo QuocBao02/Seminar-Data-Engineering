@@ -38,6 +38,9 @@ data = json.loads(df.select("value").first()[0])
 # print(data)
 df = spark.createDataFrame(data)
 df.show(50)
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
+
 
 #klines
 hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/klines/year=2023/month=10/day=13/klines.json'
@@ -48,3 +51,37 @@ data = json.loads(df.select("value").first()[0])
 # print(data)
 df = spark.createDataFrame(data)
 df.show(50)
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
+
+
+
+
+
+
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/symbol_infor1/year=2023/month=10/day=13/symbol_infor1.parquet'
+df = spark.read.parquet(hdfs_path, multiLine=True)
+df.show()
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
+
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/ticker_24h1/year=2023/month=10/day=13/ticker_24h1.parquet'
+df = spark.read.parquet(hdfs_path, multiLine=True)
+df.show()
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
+# klines
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/trades1/year=2023/month=10/day=13/trades1.parquet'
+df = spark.read.parquet(hdfs_path, multiLine=True)
+df.show()
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
+# data = json.loads(df.select("value").first()[0])
+# # print(data)
+# df = spark.createDataFrame(data)
+
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/klines1/year=2023/month=10/day=13/klines1.parquet'
+df = spark.read.parquet(hdfs_path, multiLine=True)
+df.show()
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
