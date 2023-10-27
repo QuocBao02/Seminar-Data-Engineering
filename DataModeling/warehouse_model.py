@@ -1,19 +1,17 @@
 def Trades():
     return 
 "CREATE TABLE IF NOT EXISTS Trades(trade_id BIGINT, \
-symbol_id INT PRIMARY KEY, \
 isBuyerMaker BOOLEAN, \
 isBestMatch BOOLEAN, \
 price DECIMAL(20, 10), \
 qty DECIMAL(20, 10), \
 quoteQty DECIMAL(20, 10), \
-time TIMESTAMP \
-PRIMARY KEY(trade_id, symbol_id),\
-FOREIGN KEY (symbol_id) REFERENCES Symbol_Infor(symbol_id));"
+time TIMESTAMP) \
+PARTITIONED BY(symbol_id INT);"
 
 def Symbol_Infor():
     return 
-"CREATE TABLE IF NOT EXISTS Symbol_Infor(symbol_id INT, \
+"CREATE TABLE IF NOT EXISTS Symbol_Infor( \
 symbol_name STRING, \
 status STRING, \
 baseAsset STRING, \
@@ -32,12 +30,11 @@ cancelReplaceAllowed BOOLEAN, \
 isSpotTradingAllowed BOOLEAN, \
 isMarginTradingAllowed BOOLEAN, \
 defaultSelfTradePreventionMode STRING, \
-PRIMARY KEY (symbol_id), \
-FOREIGN KEY (filter_id) REFERENCES Filters(filter_id));"
+PARTITIONED BY(symbol_id INT);"
 
 def Filters():
     return 
-"CREATE TABLE IF NOT EXISTS Filters(filter_id INT, \
+"CREATE TABLE IF NOT EXISTS Filters( filtertype_id BIGINT,\
 price_id INT, \
 lot_size_filter_id INT, \
 iceberg_parts_filter_id INT, \
@@ -47,16 +44,7 @@ percent_price_by_side_filter_id INT, \
 notional_filter_id INT, \
 max_num_orders_filter_id INT, \
 max_num_algo_orders_filter_id INT, \
-PRIMARY KEY (filter_id), \
-FOREIGN KEY (price_filter_id) REFERENCES Price_filter_detail(id), \
-FOREIGN KEY (lot_size_filter_id) REFERENCES Lot_size_filter_detail(id), \
-FOREIGN KEY (iceberg_parts_filter_id) REFERENCES Iceberg_parts_filter_detail(id), \
-FOREIGN KEY (market_lot_size_filter_id) REFERENCES Market_lot_size_filter_detail(id), \
-FOREIGN KEY (trailing_delta_filter_id) REFERENCES Trailing_delta_filter_detail(id), \
-FOREIGN KEY (percent_price_filter_id) REFERENCES Percent_price_filter_detail(id), \
-FOREIGN KEY (notional_filter_id) REFERENCES Notional_filter_detail(id), \
-FOREIGN KEY (max_num_orders_filter_id) REFERENCES Max_num_orders_filter_detail(id), \
-FOREIGN KEY (max_num_algo_orders_filter_id) REFERENCES Max_num_algo_orders_filter_detail(id), \);"
+PARTITIONED BY(symbol_id INT);"
 
 def Price_filter_detail():
     return 
@@ -64,7 +52,7 @@ def Price_filter_detail():
 maxPrice DECIMAL(20, 10), \
 minPrice DECIMAL(20, 10), \
 tickSize DECIMAL(20, 10), \
-PRIMARY KEY (id));"
+PARTITIONED BY(symbol_id INT, filter_type_id BIGINT);"
 
 def Lot_size_filter_detail():
     return 
@@ -72,13 +60,13 @@ def Lot_size_filter_detail():
 stepSize DECIMAL(20, 10), \
 maxQty DECIMAL(20, 10), \
 minQty DECIMAL(20, 10), \
-PRIMARY KEY(id));"
+PARTITIONED BY(symbol_id INT, filter_type_id BIGINT);"
 
 def Iceberg_parts_filter_detail():
     return 
 "CREATE TABLE IF NOT EXISTS Iceberg_parts_filter_detail(id INT, \
 limit INT, \
-PRIMARY KEY(id));"
+PARTITIONED BY(symbol_id INT, filter_type_id BIGINT);"
 
 def Market_lot_size_filter_detail():
     return 
@@ -86,7 +74,7 @@ def Market_lot_size_filter_detail():
 stepSize DECIMAL(20, 10), \
 maxQty DECIMAL(20, 10), \
 minQty DECIMAL(20, 10), \
-PRIMARY KEY(id));"
+PARTITIONED BY(symbol_id INT, filter_type_id BIGINT);"
 
 def Trailing_delta_filter_detail():
     return 
@@ -95,7 +83,7 @@ minTrailingBelowDelta DECIMAL(20, 10), \
 maxTrailingBelowDelta DECIMAL(20, 10), \
 maxTrailingAboveDelta DECIMAL(20, 10), \
 minTrailingAboveDelta DECIMAL(20, 10), \
-PRIMARY KEY(id));"
+PARTITIONED BY(symbol_id INT, filter_type_id BIGINT);"
 
 def Percent_price_by_side_filter_detail():
     return 
@@ -105,7 +93,7 @@ askMultiplierUp DECIMAL(20, 10), \
 bidMultiplierDown DECIMAL(20, 10), \
 avgPriceMins DECIMAL(20, 10), \
 askMultiplierDown DECIMAL(20, 10), \
-PRIMARY KEY(id));"
+PARTITIONED BY(symbol_id INT, filter_type_id BIGINT);"
 
 def Notional_filter_detail():
     return 
@@ -115,19 +103,19 @@ minNotional DECIMAL(20, 10), \
 avgPriceMins DECIMAL(20, 10), \
 applyMinToMarket BOOLEAN, \
 applyMaxToMarket BOOLEAN, \
-PRIMARY KEY(id));"
+PARTITIONED BY(symbol_id INT, filter_type_id BIGINT);"
 
 def Max_num_orders_filter_detail():
     return 
 "CREATE TABLE IF NOT EXISTS Max_num_orders_filter_detail(id INT, \
 maxNumOrders INT, \
-PRIMARY KEY(id));"
+PARTITIONED BY(symbol_id INT, filter_type_id BIGINT);"
 
 def Max_num_algo_orders_filter_detail():
     return 
 "CREATE TABLE IF NOT EXISTS Max_num_algo_orders_filter_detail(id INT, \
 maxNumAlgoOrders INT, \
-PRIMARY KEY(id));"
+PARTITIONED BY(symbol_id INT, filter_type_id BIGINT);"
 
 def Ticker_24h():
     return 
@@ -149,8 +137,7 @@ closeTime TIMESTAMP, \
 fristTradeId BIGINT, \
 lastTradeId BIGINT, \
 count BIGINT, \
-PRIMARY KEY(ticker_id, symbol_id), \
-FOREIGN KEY(symbol_id) REFERENCES Symbol_Infor(symbol_id));"
+PARTITIONED BY(symbol_id INT);"
 
 def Klines():
     return 
@@ -168,5 +155,4 @@ numberoftrades INT, \
 takerbaseassetvolume DECIMAL(20, 10), \
 takerbuyquoteassetvolume DECIMAL(20, 10), \
 ignored DECIMAL(20, 10), \
-PRIMARY KEY (kline_id, symbol_id), \
-FOREIGN KEY (symbol_id) REFERENCES Symbol_Infor(symbol_id));"
+PARTITIONED BY(symbol_id INT);"
