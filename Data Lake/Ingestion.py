@@ -168,7 +168,6 @@ def main():
     binance_datalake.closeSpark()
     binance_datalake.disconnect_Binance()
     
-
 if __name__=='__main__':
     main()
     pass
