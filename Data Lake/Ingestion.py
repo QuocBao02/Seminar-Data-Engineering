@@ -5,16 +5,19 @@ import time
 
 
 class Binance_Ingestion_Data_Lake(object):
-    def __init__(self, api_key=None, secret_key=None, database="Binance_Market_Data", hdfs_host="localhost", hdfs_port=9000):
+    def __init__(self, api_key=None, secret_key=None, database="Binance_Market_Data", hdfs_host="localhost", hdfs_port=9000, thrift_host='localhost', thrift_port=9083):
         self.api_key=api_key 
         self.secret_key=secret_key 
         self.database=database
         self.hdfs_host=hdfs_host
         self.hdfs_port=hdfs_port
+        self.host=thrift_host
+        self.metastore_port=thrift_port
         self.step=1000
         self.request_per_minute=1200
         self.amount_in_12h=720
         self.currentTime=None
+        self.spark=self._connect_DataWarehouse()
         self.binance_cli=self._connect_Binance()
         self.spark=self._initSpark()
         self.partition=self._getPartitionTime()
@@ -29,6 +32,20 @@ class Binance_Ingestion_Data_Lake(object):
         else:
             print("Connected to Binance Successfully!")
             return binance_client
+    def _connect_DataWarehouse(self):
+        ''' Initialize spark session for connecting to data warehouse '''
+        
+        spark=SparkSession.builder\
+            .appName("InitSparkSessionForETL")\
+            .config("hive.metastore.uris", f"thrift://{self.host}:{self.metastore_port}")\
+            .config("spark.sql.warehouse.dir", f"hdfs://{self.host}:{self.hdfs_port}/Binance_Market_Data/datawarehouse/")\
+            .enableHiveSupport()\
+            .getOrCreate()
+        if spark:
+            print("Spark Session is CREATED!")
+            return spark
+        else:
+            print("Spark Session can not create!")
     def disconnect_Binance(self):
         '''disconnect Binance'''
         if self.binance_cli: 
@@ -86,17 +103,37 @@ class Binance_Ingestion_Data_Lake(object):
             print(f"Loaded into {table} successfully!")
         pass
     
+    def _getLastestTradeId(self, symbol):
+        ''' Get the latest trade id of trades table'''
+        try:
+            self.spark.sql("USE binance_market_data;")
+            
+            latest_TradeId=self.spark.sql(f"SELECT trade_id FROM Trades WHERE symbol='{symbol}' ORDER BY trade_id DESC LIMIT 1;")
+            print(latest_TradeId)
+            if latest_TradeId.isEmpty():
+                return 0;
+            else:
+                latest_TradeId_value=latest_TradeId.collect()[0]['trade_id']
+                return latest_TradeId_value
+        except:
+            return 0
+        
     def getTicker_24h(self, symbol):
         '''Get the information of Ticker in 24h of a symbol and save it into datalake'''
         table='Ticker_24h'
         ticker_24h=self.binance_cli.get_ticker(symbol=symbol)
         # get firstId and lastId 
-        self.firstId=ticker_24h['firstId']
+        check_first_id=self._getLastestTradeId(symbol)
+        if check_first_id==0:
+            self.firstId=ticker_24h['firstId']
+        else:
+            self.firstId=check_first_id+1
+            
         self.lastId=ticker_24h['lastId']
         # get openTime and closeTime
         self.openTime=ticker_24h['openTime']
         self.closeTime=ticker_24h['closeTime']
-        
+        ticker_24h['count']=self.lastId-self.firstId
         hdfs_destination=self._generatePartition(table, symbol)
         if self._check_emptyDF(ticker_24h) == False:
             df=self.spark.createDataFrame([ticker_24h])
@@ -113,14 +150,12 @@ class Binance_Ingestion_Data_Lake(object):
         # check the validation of fromid and lastid
         if self.firstId > 0 and self.lastId > 0:
             for id in range(self.firstId, self.lastId+1, self.step):
-                
                 trades=self.binance_cli.get_historical_trades(symbol=symbol, fromId=id, limit=1000)
                 if self._check_emptyDF(trades) == False:
                     df=self.spark.createDataFrame(trades)
-                    df.write.parquet(hdfs_destination, mode='append')    
-                    
+                    df.write.parquet(hdfs_destination, mode='append') 
                 # sleep for a short time
-                time.sleep(60/(self.request_per_minute - 200))
+                time.sleep(0.1)  
             print(f"Loaded into {table} successfully!")
         pass
     
@@ -130,22 +165,22 @@ class Binance_Ingestion_Data_Lake(object):
         hdfs_destination=self._generatePartition(table, symbol)
         
         for starttime in range(self.openTime, self.closeTime + 1, self.amount_in_12h*60*1000):
-            
             klines=self.binance_cli.get_klines(symbol=symbol, interval=binance.Client.KLINE_INTERVAL_1MINUTE, startTime=starttime, limit=self.amount_in_12h)
             if self._check_emptyDF(klines) == False:
                 df=self.spark.createDataFrame(klines)
                 df.write.parquet(hdfs_destination, mode='append')  
+                
             # sleep for a short time
-            time.sleep(60/(self.request_per_minute - 200))
+            time.sleep((0.1))
         print(f"Loaded into {table} successfully!")
         pass    
     
     def log_datalake(self, startTime, endTime, symbols):
         start_string=f"Started ingestion data into datalake at {startTime}\n"
-        end_string=f"\nFinished ingestion data into datalake at {endTime}\n\n"
+        end_string=f"\nFinished ingestion data into datalake at {endTime}\n"
         data=start_string+str(symbols)+end_string
         
-        with open('./Data Lake/log.txt', 'a') as f:
+        with open('/home/quocbao/MyData/Seminar-Data-Engineering/Data Lake/log.txt', 'a') as f:
             f.write(data)
         
     
@@ -181,16 +216,14 @@ def main():
     
     for symbol in symbols.values():
         print(f"\n {symbol}:")
-        # symbol="BTCUSDT"
         binance_datalake.getSymbolInfor(symbol=symbol)
         binance_datalake.getTicker_24h(symbol=symbol)
         binance_datalake.getTrades(symbol=symbol)
         binance_datalake.getKlines(symbol=symbol)
     
     endTime=getCurrentTime()
-    
     binance_datalake.log_datalake(startTime, endTime, symbols)
-    # binance_datalake.spark.
+    
     binance_datalake.closeSpark()
     binance_datalake.disconnect_Binance()
     
