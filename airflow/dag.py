@@ -9,8 +9,8 @@ default_args={
     'owner': 'Quoc Bao',
     'start_date': days_ago(0),
     'email': ['baonguyen022002499@gmail.com'], 
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    # 'retries': 1,
+    # 'retry_delay': timedelta(hours=2),
 }
 
 # define the DAG 
