@@ -9,55 +9,29 @@ spark = SparkSession.builder \
             .config("spark.executor.memory", "3g") \
             .config("spark.executor.cores", "4") \
             .getOrCreate()
-# Đường dẫn trên HDFS đến tệp bạn muốn đọc
-hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/klines/year=2023/month=10/day=12/klines.json'
+# Đường dẫn trên HDFS đến tệp bạn muốn đọchdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/klines/year=2023/month=10/day=23/klines.parquet'
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/symbol_infor/year=2023/month=11/day=14/symbol_infor.parquet'
+df = spark.read.parquet(hdfs_path, multiLine=True)
+df.show(10)
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
 
-# Đọc tệp từ HDFS thành DataFrame
-# df = spark.read.json(hdfs_path)
-# Hiển thị nội dung của DataFrame
-# df.select("value").show(truncate=False)
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/ticker_24h/year=2023/month=11/day=14/ticker_24h.parquet'
+df = spark.read.parquet(hdfs_path, multiLine=True)
+df.show(10)
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
 
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/trades/year=2023/month=11/day=14/trades.parquet'
+df = spark.read.parquet(hdfs_path, multiLine=True)
+df.show(10)
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
 
-
-# local_output_path = '/home/file.txt'
-# df.select("value").write.mode("overwrite").text("file.txt")
-# df.write.mode("overwrite").json("file.json")
-# Dừng phiên
-#  làm việc Spark
-
-
-
-
-
-# # Định nghĩa schema cho dữ liệu JSON
-# custom_schema = StructType([
-#     StructField("value", ArrayType(
-#         StructType([
-#             StructField("symbol", StringType(), nullable=True),
-#             StructField("trade", ArrayType(
-#                 StructType([
-#                     StructField("id", IntegerType(), nullable=True),
-#                     StructField("price", DecimalType(10, 8), nullable=True),
-#                     StructField("qty", DecimalType(10, 8), nullable=True),
-#                     StructField("quoteQty", DecimalType(10, 8), nullable=True)
-#                 ])
-#             ))
-#         ])
-#     ))
-# ])
-
-# custom_schema = StructType([
-#     StructField("value", StringType(), nullable=True),
-# ])
-
-
-df = spark.read.text(hdfs_path)
-
-# Hiển thị nội dung của DataFrame
-json_data = df.select("value").first()[0]
-# print(json_data)
-# df.show()
-# df.write.mode("overwrite").json("file.json")
-
+hdfs_path = 'hdfs://localhost:9000/user/Binance_Data/lake/klines/year=2023/month=11/day=14/klines.parquet'
+df = spark.read.parquet(hdfs_path, multiLine=True)
+df.show(10)
+row_count = df.count()
+print(f"Số dòng trong DataFrame: {row_count}")
 spark.stop()
 
