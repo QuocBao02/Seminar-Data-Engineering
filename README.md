@@ -37,6 +37,12 @@ Hadoop hdfs is the location used to store raw data for data lake with partitione
 ![image](./image/explicity_datalake1.png)
 
 # **Data Warehouse** 
+[**Data Warehouse Model**](https://dbdiagram.io/d/64b2209402bd1c4a5e1d07ad)
+
+![image](./image/datamodel.png)
+
+Data Warehouse in Hadoop hdfs
+
 ![image](./image/datawarehouse.png)
 ![image](./image/explicity_datawarehouse.png)
 ![image](./image/explicity_datawarehouse1.png)
