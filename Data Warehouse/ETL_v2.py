@@ -1,6 +1,6 @@
 # import library 
 from pyspark.sql import SparkSession 
-import time, datetime
+import time
 import pyspark.sql.functions as F
 import sys 
 import warehouse_model
@@ -138,10 +138,10 @@ class ETL(object):
             symbols_dict=eval(string_symbols_dict[-2])
             return symbols_dict
     
-    def _getLastestId(self, old_table, symbol_id=1, column_name=None):
+    def _getLastestId(self, old_table, symbol, column_name=None):
         '''Get the latest id of column from table'''
         try:
-            latestDF_value=self.spark.sql(f"SELECT {column_name}  FROM {old_table} WHERE symbol_id={symbol_id} ORDER BY {column_name} DESC LIMIT 1;")
+            latestDF_value=self.spark.sql(f"SELECT {column_name}  FROM {old_table} WHERE symbol='{symbol}' ORDER BY {column_name} DESC LIMIT 1;")
             # latestDF_value.show()
             # print(latestDF_value.collect())
             if latestDF_value.isEmpty():
@@ -191,14 +191,13 @@ class ETL(object):
         raw_data.createOrReplaceTempView("symbol_infor_temp_tb")
         
         # get symbol_id from symbol_name 
-        symbol_id=self._getSymbol_id(symbol)
+        # symbol_id=self._getSymbol_id(symbol)
         
         # get the latest filterstype_id 
-        latest_filter_type_id=self._getLastestId(old_table="Symbol_Infor", symbol_id=symbol_id, column_name='filterstype_id')
+        latest_filter_type_id=self._getLastestId(old_table="Symbol_Infor", symbol=symbol, column_name='filterstype_id')
         
         transform_load_symbol=self.spark.sql(f"\
-        SELECT {symbol_id} AS symbol_id, \
-            allowTrailingStop ,\
+        SELECT allowTrailingStop ,\
             baseAsset ,\
             baseAssetPrecision ,\
             baseCommissionPrecision ,\
@@ -215,10 +214,10 @@ class ETL(object):
             quoteOrderQtyMarketAllowed ,\
             quotePrecision ,\
             status ,\
-            symbol AS symbol_name\
+            symbol\
         FROM symbol_infor_temp_tb;")
         
-        transform_load_symbol.write.partitionBy('symbol_id').mode("append").format("parquet").saveAsTable(f"{self.database}.symbol_infor")
+        transform_load_symbol.write.partitionBy('symbol').mode("append").format("parquet").saveAsTable(f"{self.database}.symbol_infor")
         print(f"Insert {symbol} into Symbol_Infor table successfully!")
             
         filters=self.spark.sql("""SELECT filters from symbol_infor_temp_tb;""")
@@ -226,59 +225,59 @@ class ETL(object):
         for filter in filters:
         #     print(filter)
             if(filter['filterType'] == 'PRICE_FILTER'):
-                filter['symbol_id']=symbol_id
+                filter['symbol']=symbol
                 filter['filter_type_id']=latest_filter_type_id + 1
                 df=self.spark.createDataFrame([filter])
-                df.write.partitionBy(['symbol_id', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.price_filter_detail")
+                df.write.partitionBy(['symbol', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.price_filter_detail")
                 print(f"Insert {symbol} into price_filter_detail table successfully!")
                     
             if(filter['filterType'] == 'LOT_SIZE'):
-                filter['symbol_id']=symbol_id
+                filter['symbol']=symbol
                 filter['filter_type_id']=latest_filter_type_id + 1
                 df=self.spark.createDataFrame([filter])
-                df.write.partitionBy(['symbol_id', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.lot_size_detail")
+                df.write.partitionBy(['symbol', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.lot_size_detail")
                 print(f"Insert {symbol} into lot_size_detail table successfully!")
             
             if(filter['filterType'] == 'ICEBERG_PARTS'):
-                filter['symbol_id']=symbol_id
+                filter['symbol']=symbol
                 filter['filter_type_id']=latest_filter_type_id + 1
                 df=self.spark.createDataFrame([filter])
-                df.write.partitionBy(['symbol_id', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.iceberg_parts_detail")
+                df.write.partitionBy(['symbol', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.iceberg_parts_detail")
                 print(f"Insert {symbol} into iceberg_parts_detail table successfully!")
                 
             if(filter['filterType'] == 'TRAILING_DELTA'):
-                filter['symbol_id']=symbol_id
+                filter['symbol']=symbol
                 filter['filter_type_id']=latest_filter_type_id + 1
                 df=self.spark.createDataFrame([filter])
-                df.write.partitionBy(['symbol_id', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.trailing_delta")
+                df.write.partitionBy(['symbol', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.trailing_delta")
                 print(f"Insert {symbol} into trailing_delta table successfully!")
                         
             if(filter['filterType'] == 'PERCENT_PRICE_BY_SIDE'):
-                filter['symbol_id']=symbol_id
+                filter['symbol']=symbol
                 filter['filter_type_id']=latest_filter_type_id + 1
                 df=self.spark.createDataFrame([filter])
-                df.write.partitionBy(['symbol_id', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.percent_price_by_side_detail")
+                df.write.partitionBy(['symbol', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.percent_price_by_side_detail")
                 print(f"Insert {symbol} into percent_price_by_side_detail table successfully!")
             
             if(filter['filterType'] == 'NOTIONAL'):
-                filter['symbol_id']=symbol_id
+                filter['symbol']=symbol
                 filter['filter_type_id']=latest_filter_type_id + 1
                 df=self.spark.createDataFrame([filter])
-                df.write.partitionBy(['symbol_id', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.notional_detail")
+                df.write.partitionBy(['symbol', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.notional_detail")
                 print(f"Insert {symbol} into notional_detail table successfully!")
             
             if(filter['filterType'] == 'MAX_NUM_ORDERS'):
-                filter['symbol_id']=symbol_id
+                filter['symbol']=symbol
                 filter['filter_type_id']=latest_filter_type_id + 1
                 df=self.spark.createDataFrame([filter])
-                df.write.partitionBy(['symbol_id', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.max_num_orders_detail")
+                df.write.partitionBy(['symbol', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.max_num_orders_detail")
                 print(f"Insert {symbol} into max_num_orders_detail table successfully!")
             
             if(filter['filterType'] == 'MAX_NUM_ALGO_ORDERS'):
-                filter['symbol_id']=symbol_id
+                filter['symbol']=symbol
                 filter['filter_type_id']=latest_filter_type_id + 1
                 df=self.spark.createDataFrame([filter])
-                df.write.partitionBy(['symbol_id', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.max_num_algo_orders_detail")
+                df.write.partitionBy(['symbol', 'filter_type_id']).mode("append").format("parquet").saveAsTable(f"{self.database}.max_num_algo_orders_detail")
                 print(f"Insert {symbol} into max_num_algo_orders_detail table successfully!")
     
     
@@ -287,10 +286,10 @@ class ETL(object):
         raw_data.createOrReplaceTempView("trades_temp_tb")
         
         # get symbol_id from symbol_name 
-        symbol_id=self._getSymbol_id(symbol)
+        # symbol_id=self._getSymbol_id(symbol)
         
         transform_trade_table=self.spark.sql(f"\
-            SELECT {symbol_id} AS symbol_id, \
+            SELECT '{symbol}' AS symbol, \
                 id AS trade_id,\
                 isBuyerMaker,\
                 isBestMatch,\
@@ -300,7 +299,7 @@ class ETL(object):
                 FROM_UNIXTIME(time/1000) as trade_time\
                 FROM trades_temp_tb;")
         # transform_trade_table.show(1000)
-        transform_trade_table.write.partitionBy('symbol_id').mode('append').format('parquet').saveAsTable(f"{self.database}.Trades")
+        transform_trade_table.write.partitionBy('symbol').mode('append').format('parquet').saveAsTable(f"{self.database}.Trades")
         print(f"Insert {symbol} into Trades table successfully!")
     
     def etl_Klines(self, raw_data, symbol):
@@ -308,14 +307,14 @@ class ETL(object):
         raw_data.createOrReplaceTempView("klines_temp_tb")
         
         # get symbol_id from symbol_name 
-        symbol_id=self._getSymbol_id(symbol)
+        # symbol_id=self._getSymbol_id(symbol)
         # get the latest klines_id 
-        latest_kline_id=self._getLastestId(old_table="Klines", symbol_id=symbol_id, column_name='kline_id') 
+        latest_kline_id=self._getLastestId(old_table="Klines", symbol=symbol, column_name='kline_id') 
         
         
         # transform_klines_table.show()
         transform_klines_table=self.spark.sql(f"\
-            SELECT {symbol_id} AS symbol_id, \
+            SELECT '{symbol}' AS symbol, \
                 FROM_UNIXTIME(_1/1000) AS opentime, \
                 _2    AS openPrice, \
                 _3    AS highPrice, \
@@ -331,7 +330,7 @@ class ETL(object):
             FROM klines_temp_tb;")
         # Add a new column with monotonically increasing IDs
         transform_klines_table = transform_klines_table.withColumn("kline_id", F.monotonically_increasing_id() + latest_kline_id + 1)
-        transform_klines_table.write.partitionBy('symbol_id').mode('append').format('parquet').saveAsTable(f"{self.database}.Klines")
+        transform_klines_table.write.partitionBy('symbol').mode('append').format('parquet').saveAsTable(f"{self.database}.Klines")
         
         print(f"Insert {symbol} into Klines table successfully!")  
             
@@ -340,12 +339,12 @@ class ETL(object):
         raw_data.createOrReplaceTempView("ticker_24h_tb")
         
         # get symbol_id from symbol_name 
-        symbol_id=self._getSymbol_id(symbol)
+        # symbol_id=self._getSymbol_id(symbol)
         # get the latest ticker_id 
-        latest_ticker_id=self._getLastestId(old_table="Ticker_24h", symbol_id=symbol_id, column_name='ticker_id') 
+        latest_ticker_id=self._getLastestId(old_table="Ticker_24h", symbol=symbol, column_name='ticker_id') 
 
         transform_ticker_24h_table=self.spark.sql(f"\
-            SELECT {symbol_id} as symbol_id, \
+            SELECT '{symbol}' as symbol, \
                 {latest_ticker_id + 1} as ticker_id, \
                 priceChange ,\
                 priceChangePercent ,\
@@ -365,7 +364,7 @@ class ETL(object):
                 count\
             FROM ticker_24h_tb;")
         # transform_ticker_24h_table.show()
-        transform_ticker_24h_table.write.partitionBy('symbol_id').mode('append').format('parquet').saveAsTable(f"{self.database}.Ticker_24h")
+        transform_ticker_24h_table.write.partitionBy('symbol').mode('append').format('parquet').saveAsTable(f"{self.database}.Ticker_24h")
         print(f"Insert {symbol} into Ticker_24h table successfully!")
     
 def main():  

@@ -9,8 +9,8 @@ default_args={
     'owner': 'Quoc Bao',
     'start_date': days_ago(0),
     'email': ['baonguyen022002499@gmail.com'], 
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    'retries': 0,
+    # 'retry_delay': timedelta(hours=2),
 }
 
 # define the DAG 
@@ -18,7 +18,7 @@ dag=DAG(
     dag_id="Ingest_Extract_Transform_Load_Binance_Market_Data",
     default_args=default_args,
     description=" Auto Ingest Data from Binance into DataLake, ETL into Datawarehouse",
-    schedule_interval=timedelta(days=1),
+    schedule_interval="0 8 * * *",
 )
 
 # define the ingestion data from Binance task 
