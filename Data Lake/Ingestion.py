@@ -3,6 +3,9 @@ import binance
 from  pyspark.sql import SparkSession
 import time
 
+# handle request time out
+from requests.exceptions import ReadTimeout
+
 
 class Binance_Ingestion_Data_Lake(object):
     def __init__(self, api_key=None, secret_key=None, database="Binance_Market_Data", hdfs_host="localhost", hdfs_port=9000, thrift_host='localhost', thrift_port=9083):
@@ -26,7 +29,7 @@ class Binance_Ingestion_Data_Lake(object):
     def _connect_Binance(self):
         try: 
             print("Requesting with Binance Market Data")
-            binance_client=binance.Client(api_key=self.api_key, api_secret=self.secret_key)
+            binance_client=binance.Client(api_key=self.api_key, api_secret=self.secret_key,requests_params={"timeout": 10})
         except: 
             print("Can not connect to Binance!")
         else:
@@ -150,12 +153,22 @@ class Binance_Ingestion_Data_Lake(object):
         # check the validation of fromid and lastid
         if self.firstId > 0 and self.lastId > 0:
             for id in range(self.firstId, self.lastId+1, self.step):
-                trades=self.binance_cli.get_historical_trades(symbol=symbol, fromId=id, limit=1000)
+                
+                # handle request time out.
+                while True:
+                    try:
+                        trades=self.binance_cli.get_historical_trades(symbol=symbol, fromId=id, limit=1000)
+                        break
+                    except ReadTimeout:
+                        time.sleep(5)
+                        
                 if self._check_emptyDF(trades) == False:
                     df=self.spark.createDataFrame(trades)
                     df.write.parquet(hdfs_destination, mode='append') 
+                
                 # sleep for a short time
-                time.sleep(0.1)  
+                time.sleep(60/(self.request_per_minute - 1))
+                
             print(f"Loaded into {table} successfully!")
         pass
     
@@ -165,13 +178,21 @@ class Binance_Ingestion_Data_Lake(object):
         hdfs_destination=self._generatePartition(table, symbol)
         
         for starttime in range(self.openTime, self.closeTime + 1, self.amount_in_12h*60*1000):
-            klines=self.binance_cli.get_klines(symbol=symbol, interval=binance.Client.KLINE_INTERVAL_1MINUTE, startTime=starttime, limit=self.amount_in_12h)
+            
+            # handle request time out
+            while True:
+                try:
+                    klines=self.binance_cli.get_klines(symbol=symbol, interval=binance.Client.KLINE_INTERVAL_1MINUTE, startTime=starttime, limit=self.amount_in_12h)
+                    break 
+                except ReadTimeout:
+                    time.sleep(10)
+
             if self._check_emptyDF(klines) == False:
                 df=self.spark.createDataFrame(klines)
                 df.write.parquet(hdfs_destination, mode='append')  
                 
             # sleep for a short time
-            time.sleep((0.1))
+            time.sleep(60/(self.request_per_minute - 1))
         print(f"Loaded into {table} successfully!")
         pass    
     
@@ -204,10 +225,10 @@ def getCurrentTime():
 
 
 def main():   
-    # api_path='/home/quocbao/MyData/Binance_API_Key/binance_api_key.txt'
-    api_key = "aRkqlapnqhNXa1bYU4Q7QWkru6DHA5sdRrmKxnRTPXjbXbZhqOPCJ8p0oNCNNbhY"
-    secret_key = "uK3edZV3Wy2blZHEC67UlsQVgm48JRz1WlWi5ZNrJDg4Aajt3B0QwDMQjOS6cHnH"
-    # (api_key, secret_key)=get_api(path=api_path)
+    api_path='/home/quocbao/MyData/Binance_API_Key/binance_api_key.txt'
+    # api_key = "aRkqlapnqhNXa1bYU4Q7QWkru6DHA5sdRrmKxnRTPXjbXbZhqOPCJ8p0oNCNNbhY"
+    # secret_key = "uK3edZV3Wy2blZHEC67UlsQVgm48JRz1WlWi5ZNrJDg4Aajt3B0QwDMQjOS6cHnH"
+    (api_key, secret_key)=get_api(path=api_path)
     Database="Binance_Market_Data"
     startTime=getCurrentTime()
     binance_datalake=Binance_Ingestion_Data_Lake(api_key=api_key, secret_key=secret_key, database=Database)
