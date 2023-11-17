@@ -4,13 +4,17 @@ from airflow import DAG
 from airflow.operators.bash_operator import BashOperator 
 from airflow.utils.dates import days_ago
 
+
+target_time = 10
+hour=target_time - 7 # 7 is the time zone of VietNam 
+
 # define DAG arguments 
 default_args={
     'owner': 'Quoc Bao',
-    'start_date': days_ago(0),
+    'start_date': days_ago(1),
     'email': ['baonguyen022002499@gmail.com'], 
-    'retries': 0,
-    # 'retry_delay': timedelta(hours=2),
+    'retries': 1,
+    'retry_delay': timedelta(minutes=2),
 }
 
 # define the DAG 
@@ -18,7 +22,7 @@ dag=DAG(
     dag_id="Ingest_Extract_Transform_Load_Binance_Market_Data",
     default_args=default_args,
     description=" Auto Ingest Data from Binance into DataLake, ETL into Datawarehouse",
-    schedule_interval="0 8 * * *",
+    schedule_interval=f"17 {hour} * * *",
 )
 
 # define the ingestion data from Binance task 
