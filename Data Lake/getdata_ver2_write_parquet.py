@@ -1,12 +1,6 @@
 from pyspark.sql import SparkSession
-import os
-from pyspark.sql.types import StringType
 import binance
-import parquet
-import pandas as pd
-from hdfs import InsecureClient
 from datetime import datetime
-import time
 from pyspark.sql.types import StructType
 from pyspark.sql.functions import unix_timestamp
 
@@ -267,15 +261,5 @@ if __name__=='__main__':
 
     #klines
     _binance.get_klines(symbols_list=symbols_list)
-    # df=_binance._getLastestIdDataFrame(old_table="trades", column_name="trade_id")
-    # if df==0:
-    #         old_data_dir ={"symbol_id":"","trade_id":-1}
-    #         print(old_data_dir)
-    # else:
-    #         old_data_dir = {row["symbol_id"]: row["trade_id"] for row in df.collect()}
-    #         print(old_data_dir)
-    # _binance.closeSpark()
-    # _binance.closeSpark()
-    # _binance.closeSpark()
     _binance.closeSpark()
     

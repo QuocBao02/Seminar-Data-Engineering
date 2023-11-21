@@ -274,10 +274,12 @@ def transform_table_klines(self, input_df):
     ignore,\
     low,\
     open,\
+    close,\
     quoteAssetVolume,\
     takerBuyBaseAssetVolume,\
     takerBuyQuoteAssetVolume,\
-    trades     
+    trades,\
+    volume \
     FROM klines_temp_tb;
     """)
     return transformed
