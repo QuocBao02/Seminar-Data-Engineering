@@ -17,7 +17,7 @@ class Binance_Ingestion_Data_Lake(object):
         self.host=thrift_host
         self.metastore_port=thrift_port
         self.step=1000
-        self.request_per_minute=1200
+        self.request_per_minute=6000
         self.amount_in_12h=720
         self.currentTime=None
         self.spark=self._connect_DataWarehouse()
@@ -131,6 +131,7 @@ class Binance_Ingestion_Data_Lake(object):
             self.firstId=ticker_24h['firstId']
         else:
             self.firstId=check_first_id+1
+            ticker_24h['firstId'] = self.firstId
             
         self.lastId=ticker_24h['lastId']
         # get openTime and closeTime
@@ -150,6 +151,7 @@ class Binance_Ingestion_Data_Lake(object):
         table='Trades'
         hdfs_destination=self._generatePartition(table, symbol)
         
+        trades_data = []
         # check the validation of fromid and lastid
         if self.firstId > 0 and self.lastId > 0:
             for id in range(self.firstId, self.lastId+1, self.step):
@@ -158,17 +160,17 @@ class Binance_Ingestion_Data_Lake(object):
                 while True:
                     try:
                         trades=self.binance_cli.get_historical_trades(symbol=symbol, fromId=id, limit=1000)
+                        trades_data = trades_data + trades
                         break
                     except ReadTimeout:
                         time.sleep(5)
                         
-                if self._check_emptyDF(trades) == False:
-                    df=self.spark.createDataFrame(trades)
-                    df.write.parquet(hdfs_destination, mode='append') 
-                
                 # sleep for a short time
                 time.sleep(60/(self.request_per_minute - 1))
                 
+            if self._check_emptyDF(trades_data) == False:
+                    df=self.spark.createDataFrame(trades_data)
+                    df.write.parquet(hdfs_destination, mode='append') 
             print(f"Loaded into {table} successfully!")
         pass
     
@@ -177,22 +179,22 @@ class Binance_Ingestion_Data_Lake(object):
         table="Klines"
         hdfs_destination=self._generatePartition(table, symbol)
         
+        klines_data = []
         for starttime in range(self.openTime, self.closeTime + 1, self.amount_in_12h*60*1000):
-            
             # handle request time out
             while True:
                 try:
                     klines=self.binance_cli.get_klines(symbol=symbol, interval=binance.Client.KLINE_INTERVAL_1MINUTE, startTime=starttime, limit=self.amount_in_12h)
+                    klines_data = klines_data + klines
                     break 
                 except ReadTimeout:
-                    time.sleep(10)
-
-            if self._check_emptyDF(klines) == False:
-                df=self.spark.createDataFrame(klines)
-                df.write.parquet(hdfs_destination, mode='append')  
-                
+                    time.sleep(5)
+    
             # sleep for a short time
             time.sleep(60/(self.request_per_minute - 1))
+        if self._check_emptyDF(klines_data) == False:
+                df=self.spark.createDataFrame(klines_data)
+                df.write.parquet(hdfs_destination, mode='append')
         print(f"Loaded into {table} successfully!")
         pass    
     
@@ -225,10 +227,10 @@ def getCurrentTime():
 
 
 def main():   
-    api_path='/home/quocbao/MyData/Binance_API_Key/binance_api_key.txt'
-    # api_key = "aRkqlapnqhNXa1bYU4Q7QWkru6DHA5sdRrmKxnRTPXjbXbZhqOPCJ8p0oNCNNbhY"
-    # secret_key = "uK3edZV3Wy2blZHEC67UlsQVgm48JRz1WlWi5ZNrJDg4Aajt3B0QwDMQjOS6cHnH"
-    (api_key, secret_key)=get_api(path=api_path)
+    # api_path='/home/quocbao/MyData/Binance_API_Key/binance_api_key.txt'
+    api_key = "aRkqlapnqhNXa1bYU4Q7QWkru6DHA5sdRrmKxnRTPXjbXbZhqOPCJ8p0oNCNNbhY"
+    secret_key = "uK3edZV3Wy2blZHEC67UlsQVgm48JRz1WlWi5ZNrJDg4Aajt3B0QwDMQjOS6cHnH"
+    # (api_key, secret_key)=get_api(path=api_path)
     Database="Binance_Market_Data"
     startTime=getCurrentTime()
     binance_datalake=Binance_Ingestion_Data_Lake(api_key=api_key, secret_key=secret_key, database=Database)
