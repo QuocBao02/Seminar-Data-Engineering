@@ -5,7 +5,7 @@ from airflow.operators.bash_operator import BashOperator
 from airflow.utils.dates import days_ago
 
 
-target_time = 10
+target_time = 11
 hour=target_time - 7 # 7 is the time zone of VietNam 
 
 # define DAG arguments 
@@ -22,7 +22,7 @@ dag=DAG(
     dag_id="Ingest_Extract_Transform_Load_Binance_Market_Data",
     default_args=default_args,
     description=" Auto Ingest Data from Binance into DataLake, ETL into Datawarehouse",
-    schedule_interval=f"17 {hour} * * *",
+    schedule_interval=f"15 {hour} * * *",
 )
 
 # define the ingestion data from Binance task 
@@ -38,6 +38,12 @@ etl= BashOperator(
         /home/quocbao/MyData/Seminar-Data-Engineering/Data\ Lake/log.txt',
     dag=dag,
 )
+# define the visualization task 
+visualize=BashOperator(
+    task_id='visualize',
+    bash_command='python3 /home/quocbao/MyData/Seminar-Data-Engineering/Superset_DataSet/daily_dataset.py',
+    dag=dag,
+)
 
 # task pipeline 
-ingestion >> etl
+ingestion >> etl >> visualize

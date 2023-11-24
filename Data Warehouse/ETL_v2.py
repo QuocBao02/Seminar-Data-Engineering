@@ -222,6 +222,7 @@ class ETL(object):
             
         filters=self.spark.sql("""SELECT filters from symbol_infor_temp_tb;""")
         filters=filters.collect()[0]['filters']
+        
         for filter in filters:
         #     print(filter)
             if(filter['filterType'] == 'PRICE_FILTER'):
@@ -306,8 +307,6 @@ class ETL(object):
         # create a temporary table 
         raw_data.createOrReplaceTempView("klines_temp_tb")
         
-        # get symbol_id from symbol_name 
-        # symbol_id=self._getSymbol_id(symbol)
         # get the latest klines_id 
         latest_kline_id=self._getLastestId(old_table="Klines", symbol=symbol, column_name='kline_id') 
         
